@@ -1,12 +1,18 @@
+##
+##  Calculation library for odds relate to the Traitors reality game show
+##  Also related to mafia / warewolf, etc
+##
+##  Author: Ryan McCorvie
+##  Copyright 2025
+##
+
 library( tidyverse)
-library( RColorBrewer)
-library(ggsci)
+source( "traitors history.R")
 
 
-
-#
-# Probability that traitors win
-#
+##
+## Probability that traitors win
+##
 
 traitors_win_boundary <- \( mafia = F )
 {
@@ -46,6 +52,11 @@ traitors_win_prob <- \( p_twin )
 
 
 
+##
+##  Probability a specific traitor wins 
+##
+
+
 one_traitor_win_boundary <- \()
 {
   p_1t <- matrix( NA, nrow = PP, ncol = TT+1)
@@ -68,7 +79,7 @@ one_traitor_win_boundary <- \()
 }
 
 
-one_traitor_win_prob <- \( p_1t )
+one_traitor_win_prob_dp <- \( p_1t )
 {
   for( pp in 1:PP)
     for( tt in 1:min(pp,TT) )
@@ -84,6 +95,20 @@ one_traitor_win_prob <- \( p_1t )
       p_1t[pp,tt+1] = sum( probs * nextstate )
     }
   p_1t
+}
+
+
+#
+#  Shortcut dividing traitors win prob by # traitors
+#
+
+one_traitor_win_prob <- \()
+{
+  # pmin is hack to avoid NaN in the case # traitors = 0
+  n_tt <- rep(0:TT,PP) |> pmax( 0.1 ) |> matrix( nrow=TT+1, ncol=PP) |> t()
+  
+  traitors_win <- traitors_win_boundary() |> traitors_win_prob()
+  traitors_win / n_tt
 }
 
 
@@ -108,7 +133,7 @@ one_faithful_win_boundary <- \()
   p_1f  
 }
 
-one_faithful_win_prob <- \( p_1f )
+one_faithful_win_prob_dp <- \( p_1f )
 {
   for( pp in 1:PP)
     for( tt in 1:min(pp,TT) )
@@ -132,6 +157,19 @@ one_faithful_win_prob <- \( p_1f )
 }
 
 
+one_faithful_win_prob <- \()
+{
+  n_pp <- rep(1:PP,TT+1) |> matrix( nrow=PP, ncol=TT+1)
+  n_tt <- rep(0:TT,PP)   |> matrix( nrow=TT+1, ncol=PP) |> t()
+  
+  traitors_win <- traitors_win_boundary() |> traitors_win_prob()
+  
+  (1-traitors_win) / (n_pp-n_tt)
+}
+
+##
+##  Utility functions
+##
 
 tibblize <- \( MM, var_name = "probability" ) 
 {
@@ -146,61 +184,53 @@ blend_evenodd <- \(MM)
   MM
 }
 
+
+##
+##  Perform calculations
+##
+
 # game parameters 
 TT <- 6   # Number of traitors
 PP <- 30  # Number of players
 
 
-traitors_win     <- traitors_win_boundary() |> traitors_win_prob()
-one_traitor_win  <- one_traitor_win_boundary() |> one_traitor_win_prob() 
-one_faithful_win <- one_faithful_win_boundary() |> one_faithful_win_prob() 
+history_tibble <- \( series_history_tt )
+{
+  traitors_win    <- traitors_win_boundary() |> traitors_win_prob()
+  traitors_win_tt <- traitors_win |> tibblize( "traitor win" ) |> mutate( `faithful win` = 1-`traitor win`)
+  #one_traitor_win  <- one_traitor_win_boundary() |> one_traitor_win_prob_dp() 
+  #one_faithful_win <- one_faithful_win_boundary() |> one_faithful_win_prob_dp() 
+  
+  one_traitor_win  <- one_traitor_win_prob() 
+  one_faithful_win <- one_faithful_win_prob() 
+  
+  one_traitor_win_tt  <- one_traitor_win  |> tibblize( "prob 1t" ) 
+  one_faithful_win_tt <- one_faithful_win |> tibblize( "prob 1f" )
+  
+  series_history_tt |> left_join( traitors_win_tt) |> 
+    left_join( one_traitor_win_tt ) |> 
+    left_join( one_faithful_win_tt ) |> 
+    mutate( 
+      `expected traitor prize` = `prob 1t` * prize,
+      `expected faithful pirze` = `prob 1f` *  prize 
+    )
+}
 
-one_faithful_win
+traitors_win    <- traitors_win_boundary( mafia=F) |> traitors_win_prob()
+traitors_win_tt <- traitors_win |> tibblize( "traitor win" )
 
-tt1 <- traitors_win |> tibblize() |> mutate( mode = "traitors win")
-
-ggplot( tt1, aes( y=`num traitors`, x=`num players`)) + 
-  geom_tile( aes( fill = probability)) +
-  scale_fill_gradient2(low = "#2E5A87", mid = 'white', high = "#A3123A", midpoint=0.5) +
+ggplot( traitors_win_tt, aes( y=`num traitors`, x=`num players`)) + 
+  geom_tile( aes( fill = `traitor win`)) +
+  scale_fill_gradient2(low = "#2E5A87", mid = 'white', high = "#A3123A", midpoint=0.5,labels = scales::percent_format(accuracy=1)) +
   theme_minimal()
 
-prize <- 100000
-tt2 <- one_traitor_win  |> tibblize() |> mutate( mode = "one traitor wins")
-tt3 <- one_faithful_win |> tibblize() |> mutate( mode = "one faithful wins")
-plotme <-  bind_rows( tt2, tt3) |> mutate( `expected payout` = prize * probability )
+us3_probabilty_tt <- history_tibble( us3_history )
+uk3_probabilty_tt <- history_tibble( uk3_history )
 
-ggplot( tt2, aes( y=`num traitors`, x=`num players`)) + 
-  geom_tile( aes( fill = probability)) +
-  scale_fill_gradient2(low = "#2E5A87", mid = 'white', high = "#A3123A", midpoint=0) +
-  theme_minimal()
+uk3_probabilty_tt
 
-t(t(one_traitor_win) * (0:TT)) + one_faithful_win*(1:PP)
-
-n_pp <- rep(1:PP,TT+1) |> matrix( nrow=PP, ncol=TT+1)
-n_tt <- rep(0:TT,PP) |> matrix( nrow=TT+1, ncol=PP) |> t()
-
-(n_pp-n_tt)*one_faithful_win + n_tt * one_traitor_win
-
-n_tt * one_traitor_win - traitors_win
-
-matrix(1,3,3) * 1:3
-#
-#  Probability a given traitor / faithful wins 
+# TO DO
+# boundary condtions related to final (no murder, only banishment)
 #
 
 
-
-
-#
-#  Expected winnings for a given traitor / faithful
-#
-
-
-plotme <- plotme |> filter( `num players` %% 100== 0)
-
-ggplot( plotme, aes( y=`num traitors`, x=`num players`)) + 
-  geom_tile( aes( fill = probability)) +
-  scale_fill_gradient2(low = "#2E5A87", mid = 'white', high = "#A3123A", midpoint=0.5) +
-  theme_minimal()
-
-# Probability that I as mafia player survives
