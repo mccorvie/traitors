@@ -212,7 +212,7 @@ history_tibble <- \( series_history_tt )
     left_join( one_faithful_win_tt ) |> 
     mutate( 
       `expected traitor prize` = `prob 1t` * prize,
-      `expected faithful pirze` = `prob 1f` *  prize 
+      `expected faithful prize` = `prob 1f` *  prize 
     )
 }
 
@@ -229,8 +229,28 @@ uk3_probabilty_tt <- history_tibble( uk3_history )
 
 uk3_probabilty_tt
 
+ggplot( us3_probabilty_tt, aes( x=episode)) + 
+  geom_line( color = "#2E5A87", aes(y=`faithful win`)) + 
+  geom_point( color = "#2E5A87", aes(y=`faithful win`)) + 
+  geom_line( color = "#A3123A", aes( y=`traitor win`)) +
+  geom_point( color = "#A3123A", aes( y=`traitor win`)) +
+  scale_y_continuous(labels = scales::percent, limits=c(0,1)) +
+  theme_minimal()
+
+us3_probabilty_tt
+
+ggplot( us3_probabilty_tt, aes( x=episode)) + 
+  geom_line( color = "#2E5A87", aes(y=`expected faithful prize`)) + 
+  geom_point( color = "#2E5A87", aes(y=`expected faithful prize`)) + 
+  geom_line( color = "#A3123A", aes( y=`expected traitor prize`)) +
+  geom_point( color = "#A3123A", aes( y=`expected traitor prize`)) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  theme_minimal()
+
 # TO DO
-# boundary condtions related to final (no murder, only banishment)
-#
+# boundary conditions related to final (no murder, only banishment)
+# analyze seduce option
+
+# nicer graphs
 
 
