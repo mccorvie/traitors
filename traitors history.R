@@ -21,13 +21,13 @@ series_history <- \( season, pp_hist, tt_hist, prize )
   )
 }
 
-uk3_pp <- c( 22, 20, 18, 17, 17, 16, 14 )
-uk3_tt <- c(  3,  3,  3,  2,  2,  2,  2 )
+uk3_pp <- c( 22, 20, 18, 17, 17, 16, 14, 12, 10 )
+uk3_tt <- c(  3,  3,  3,  2,  2,  2,  2,  1,  2 )
 uk3_prize <- 100000
 uk3_history <- series_history( "UK season 3", uk3_pp, uk3_tt, uk3_prize )
 
 
-us3_pp <- c( 20, 21, 19  )
-us3_tt <- c(  3,  4,  4 )
+us3_pp <- c( 20, 21, 19, 17  )
+us3_tt <- c(  3,  4,  4,  3 )
 us3_prize <- 250000
 us3_history <- series_history( "US season 3", us3_pp, us3_tt, us3_prize )

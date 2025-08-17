@@ -14,7 +14,7 @@ source( "traitors history.R")
 ## Probability that traitors win
 ##
 
-traitors_win_boundary <- \( mafia = F )
+mafia_win_boundary <- \( traitors_rules = T )
 {
   p_twin <- matrix( NA, nrow = PP, ncol = TT+1)
 
@@ -28,16 +28,29 @@ traitors_win_boundary <- \( mafia = F )
     for( tt in majority:min(pp,TT))
       p_twin[ pp,tt+1 ] = 1
   }
-  
-  # 2 payers, 1 traitor
-  if( mafia )
-    p_twin[ 2,2 ] = 0.5 # equal votes -> coin flip
-  else
-    p_twin[ 2,2 ] = 1   # traitor survives to end, wins it all
 
+  if( traitors_rules ) 
+    p_twin[ 2,2 ] = 1 # equal votes -> traitors win
+  else  
+    p_twin[ 2,2 ] = 0.5 # equal votes -> coin flip
+  
   p_twin  
 }
 
+# This corresponds to the mechanics of the finale:
+# For the final 4 or 5, randomly eliminate without murders
+
+traitors_finale_boundary <- \( p_twin )
+{
+  for( pp in 1:5)
+    for( tt in 1:min(pp,TT) )
+    {
+      if( !is.na(p_twin[pp,tt+1])) next
+      p_twin[pp,tt+1] = tt/pp * p_twin[pp-1,tt] + (pp-tt)/pp * p_twin[pp-1,tt+1] 
+    }
+  
+  p_twin
+}
 
 traitors_win_prob <- \( p_twin )
 {
@@ -78,6 +91,7 @@ one_traitor_win_boundary <- \()
   p_1t  
 }
 
+# dynamic pogramming / backward induction solution to probability a particular traitor wins
 
 one_traitor_win_prob_dp <- \( p_1t )
 {
@@ -98,16 +112,14 @@ one_traitor_win_prob_dp <- \( p_1t )
 }
 
 
-#
 #  Shortcut dividing traitors win prob by # traitors
-#
 
 one_traitor_win_prob <- \()
 {
   # pmin is hack to avoid NaN in the case # traitors = 0
   n_tt <- rep(0:TT,PP) |> pmax( 0.1 ) |> matrix( nrow=TT+1, ncol=PP) |> t()
   
-  traitors_win <- traitors_win_boundary() |> traitors_win_prob()
+  traitors_win <- mafia_win_boundary() |> traitors_win_prob()
   traitors_win / n_tt
 }
 
@@ -132,6 +144,8 @@ one_faithful_win_boundary <- \()
   
   p_1f  
 }
+
+# dynamic pogramming / backward induction solution to probability a particular traitor wins
 
 one_faithful_win_prob_dp <- \( p_1f )
 {
@@ -162,7 +176,7 @@ one_faithful_win_prob <- \()
   n_pp <- rep(1:PP,TT+1) |> matrix( nrow=PP, ncol=TT+1)
   n_tt <- rep(0:TT,PP)   |> matrix( nrow=TT+1, ncol=PP) |> t()
   
-  traitors_win <- traitors_win_boundary() |> traitors_win_prob()
+  traitors_win <- mafia_win_boundary() |> traitors_win_prob()
   
   (1-traitors_win) / (n_pp-n_tt)
 }
@@ -196,7 +210,7 @@ PP <- 30  # Number of players
 
 history_tibble <- \( series_history_tt )
 {
-  traitors_win    <- traitors_win_boundary() |> traitors_win_prob()
+  traitors_win    <- mafia_win_boundary() |> traitors_win_prob()
   traitors_win_tt <- traitors_win |> tibblize( "traitor win" ) |> mutate( `faithful win` = 1-`traitor win`)
   #one_traitor_win  <- one_traitor_win_boundary() |> one_traitor_win_prob_dp() 
   #one_faithful_win <- one_faithful_win_boundary() |> one_faithful_win_prob_dp() 
@@ -216,8 +230,22 @@ history_tibble <- \( series_history_tt )
     )
 }
 
-traitors_win    <- traitors_win_boundary( mafia=F) |> traitors_win_prob()
+mafia_win    <- mafia_win_boundary( F ) |> traitors_win_prob()
+mafia_win1   <- mafia_win_boundary( T ) |> traitors_win_prob()
+traitors_win <- mafia_win_boundary( T ) |> traitors_finale_boundary() |> traitors_win_prob()
+
+
+prob_increase <-  (traitors_win - mafia_win) |> tibblize( var_name = "win prob increase")
+mafia_increase
+
+ggplot( mafia_increase, aes( y=`num traitors`, x=`num players`)) + 
+  geom_tile( aes( fill = `win prob increase`)) +
+  scale_fill_gradient2(low = "#2E5A87", mid = 'white', high = "#A3123A", midpoint=0,labels = scales::percent_format(accuracy=1)) +
+  theme_minimal()
+
+
 traitors_win_tt <- traitors_win |> tibblize( "traitor win" )
+
 
 ggplot( traitors_win_tt, aes( y=`num traitors`, x=`num players`)) + 
   geom_tile( aes( fill = `traitor win`)) +
@@ -229,7 +257,7 @@ uk3_probabilty_tt <- history_tibble( uk3_history )
 
 uk3_probabilty_tt
 
-ggplot( us3_probabilty_tt, aes( x=episode)) + 
+ggplot( uk3_probabilty_tt, aes( x=episode)) + 
   geom_line( color = "#2E5A87", aes(y=`faithful win`)) + 
   geom_point( color = "#2E5A87", aes(y=`faithful win`)) + 
   geom_line( color = "#A3123A", aes( y=`traitor win`)) +
@@ -248,9 +276,7 @@ ggplot( us3_probabilty_tt, aes( x=episode)) +
   theme_minimal()
 
 # TO DO
-# boundary conditions related to final (no murder, only banishment)
 # analyze seduce option
-
 # nicer graphs
 
 
